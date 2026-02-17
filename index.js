@@ -54,29 +54,15 @@ async function checkVinted() {
 
 
     const items = await page.evaluate(() => {
-      const results = [];
-    
-      const cards = document.querySelectorAll('[data-testid="grid-item"]');
-    
-      cards.forEach(card => {
-        const link = card.querySelector('a');
-        const priceElement = card.querySelector('[data-testid="item-price"]');
-    
-        if (!link || !priceElement) return;
-    
-        const priceText = priceElement.innerText;
-        const price = parseFloat(priceText.replace('€', '').replace(',', '.'));
-    
-        results.push({
-          link: link.href,
-          price
-        });
-      });
-
-  return results;
+  const links = Array.from(document.querySelectorAll('a'));
+  return links
+    .map(link => link.href)
+    .filter(href => href.includes('/items/'));
 });
 
-    console.log("Items trovati:", items.length);
+
+    console.log("Links trovati:", items.length);
+
 
     const channel = await client.channels.fetch(CHANNEL_ID);
 
