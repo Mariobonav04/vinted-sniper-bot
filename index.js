@@ -20,12 +20,20 @@ async function checkVinted() {
       }
     });
 
-    console.log("Lunghezza HTML:", data.length);
+    const jsonMatch = data.match(/window\.__INITIAL_STATE__\s*=\s*(\{.*?\});/s);
 
-    const channel = await client.channels.fetch(CHANNEL_ID);
-    if (channel) {
-      await channel.send("🔎 Test Vinted completato. Controlla i log su Railway.");
+    if (!jsonMatch) {
+      console.log("JSON non trovato");
+      return;
     }
+
+    const jsonData = JSON.parse(jsonMatch[1]);
+
+    console.log("JSON trovato!");
+
+    const items = jsonData.catalog?.items || [];
+
+    console.log("Numero items trovati:", items.length);
 
   } catch (err) {
     console.log("Errore:", err.message);
