@@ -63,6 +63,8 @@ async function initBrowser() {
 async function checkVinted() {
   const searches = loadSearches();
 
+  console.log("Ricerche caricate:", searches);
+
   for (const search of searches) {
 
     const url = `https://www.vinted.it/catalog?search_text=${encodeURIComponent(search.query)}`;
@@ -81,49 +83,42 @@ async function checkVinted() {
 
         const link = linkElement.href;
         const text = card.innerText;
-
         const priceMatch = text.match(/(\d+,\d+|\d+)\s?€/);
+
         if (!priceMatch) return;
 
         const price = parseFloat(priceMatch[0].replace('€', '').replace(',', '.'));
 
-        const timeMatch = text.match(/(\d+\s*(minuti|minuto|ore|ora|giorni|giorno)|oggi|ieri)/i);
-        const timeText = timeMatch ? timeMatch[0].toLowerCase() : null;
-
-        results.push({ link, price, timeText });
+        results.push({ link, price });
       });
 
       return results;
     });
 
+    console.log("Prodotti trovati:", items.length);
+
     const channel = await client.channels.fetch(search.channelId);
 
-    for (const item of items) {
+    if (!channel) {
+      console.log("Canale non trovato!");
+      continue;
+    }
 
-      if (!item.timeText) continue;
+    // 🔥 TEST: manda SOLO il primo prodotto trovato
+    if (items.length > 0) {
+      const first = items[0];
 
-      // 🔥 Filtro ultime 24 ore
-      if (
-        item.timeText.includes("giorni") ||
-        (item.timeText.includes("giorno") && !item.timeText.includes("ieri"))
-      ) {
-        continue;
-      }
+      console.log("Invio test:", first.link);
 
-      if (!sentItems.has(item.link) && item.price <= search.maxPrice) {
-        sentItems.add(item.link);
-
-        await channel.send(
-          `🚨 POSSIBILE AFFARE (≤24h)\n` +
-          `Ricerca: ${search.query}\n` +
-          `Prezzo: ${item.price}€\n` +
-          `Pubblicato: ${item.timeText}\n` +
-          `Link: ${item.link}`
-        );
-      }
+      await channel.send(
+        `🔥 TEST INVIO\n` +
+        `Prezzo: ${first.price}€\n` +
+        `Link: ${first.link}`
+      );
     }
   }
 }
+
 
 // =====================
 // Discord Commands
