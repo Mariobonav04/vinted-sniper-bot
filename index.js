@@ -42,6 +42,7 @@ async function checkVinted() {
 
 
 
+
 // 🔥 IMPORTANTE: usare clientReady
 client.once('clientReady', () => {
   console.log(`Bot online come ${client.user.tag}`);
