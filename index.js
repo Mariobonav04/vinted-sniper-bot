@@ -9,36 +9,36 @@ const client = new Client({
 });
 
 async function checkVinted() {
-  console.log("Controllo Vinted...");
+  console.log("Controllo Vinted API...");
 
   try {
-    const url = "https://www.vinted.it/catalog?search_text=funko";
+    const url = "https://www.vinted.it/api/v2/catalog/items?search_text=funko";
 
     const { data } = await axios.get(url, {
       headers: {
-        "User-Agent": "Mozilla/5.0"
+        "User-Agent": "Mozilla/5.0",
+        "Accept": "application/json"
       }
     });
 
-    const jsonMatch = data.match(/window\.__INITIAL_STATE__\s*=\s*(\{.*?\});/s);
-
-    if (!jsonMatch) {
-      console.log("JSON non trovato");
+    if (!data.items) {
+      console.log("Nessun campo items trovato");
       return;
     }
 
-    const jsonData = JSON.parse(jsonMatch[1]);
+    console.log("Items trovati:", data.items.length);
 
-    console.log("JSON trovato!");
+    const first = data.items[0];
 
-    const items = jsonData.catalog?.items || [];
-
-    console.log("Numero items trovati:", items.length);
+    console.log("Primo titolo:", first.title);
+    console.log("Primo prezzo:", first.price);
+    console.log("Primo link:", "https://www.vinted.it/items/" + first.id);
 
   } catch (err) {
-    console.log("Errore:", err.message);
+    console.log("Errore:", err.response?.status || err.message);
   }
 }
+
 
 // 🔥 IMPORTANTE: usare clientReady
 client.once('clientReady', () => {
