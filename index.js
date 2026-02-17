@@ -21,56 +21,22 @@ const sentItems = new Set();
 async function checkVinted() {
   console.log("Controllo Vinted...");
 
-  const channel = client.channels.cache.get(CHANNEL_ID);
-  if (!channel) {
-    console.log("Canale non trovato");
-    return;
-  }
+  try {
+    const url = "https://www.vinted.it/catalog?search_text=funko";
 
-  for (const product of products) {
-    try {
-      const url = `https://www.vinted.it/catalog?search_text=${encodeURIComponent(product.name)}`;
+    const { data } = await axios.get(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0"
+      }
+    });
 
-      const { data } = await axios.get(url, {
-        headers: {
-          "User-Agent": "Mozilla/5.0"
-        }
-      });
+    console.log("Lunghezza HTML:", data.length);
 
-      const $ = cheerio.load(data);
-
-      $('a[href*="/items/"]').each((_, el) => {
-        const relativeLink = $(el).attr('href');
-        if (!relativeLink) return;
-
-        const link = "https://www.vinted.it" + relativeLink;
-
-        if (sentItems.has(link)) return;
-
-        const parent = $(el).closest('div');
-        const priceText = parent.text().match(/(\d+,\d+|\d+)\s?€/);
-
-        if (!priceText) return;
-
-        const price = parseFloat(priceText[0].replace('€', '').replace(',', '.'));
-
-        if (price <= product.maxPrice) {
-          sentItems.add(link);
-
-          channel.send(
-            `🚨 POSSIBILE AFFARE!\n` +
-            `Prodotto: ${product.name}\n` +
-            `Prezzo: ${price}€\n` +
-            `Link: ${link}`
-          );
-        }
-      });
-
-    } catch (err) {
-      console.log("Errore:", err.message);
-    }
+  } catch (err) {
+    console.log("Errore:", err.message);
   }
 }
+
 
 client.once('ready', () => {
   console.log(`Bot online come ${client.user.tag}`);
