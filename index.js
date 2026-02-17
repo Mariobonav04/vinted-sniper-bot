@@ -1,22 +1,38 @@
 const { Client, GatewayIntentBits } = require('discord.js');
 const puppeteer = require('puppeteer');
+const fs = require('fs');
 
 const TOKEN = process.env.DISCORD_TOKEN;
-const CHANNEL_ID = process.env.CHANNEL_ID;
 
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds]
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent
+  ]
 });
-
-const products = [
-  { name: "funko venom", maxPrice: 20 },
-  { name: "funko carnage", maxPrice: 18 }
-];
-
-const sentItems = new Set();
 
 let browser;
 let page;
+const sentItems = new Set();
+const DATA_FILE = './searches.json';
+
+// =====================
+// Utility file functions
+// =====================
+
+function loadSearches() {
+  if (!fs.existsSync(DATA_FILE)) return [];
+  return JSON.parse(fs.readFileSync(DATA_FILE));
+}
+
+function saveSearches(data) {
+  fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+}
+
+// =====================
+// Puppeteer init
+// =====================
 
 async function initBrowser() {
   browser = await puppeteer.launch({
@@ -40,15 +56,18 @@ async function initBrowser() {
   });
 }
 
+// =====================
+// Scraper
+// =====================
+
 async function checkVinted() {
-  console.log("Controllo prodotti...");
+  const searches = loadSearches();
 
-  const channel = await client.channels.fetch(CHANNEL_ID);
+  for (const search of searches) {
 
-  for (const product of products) {
-    const url = `https://www.vinted.it/catalog?search_text=${encodeURIComponent(product.name)}`;
+    const url = `https://www.vinted.it/catalog?search_text=${encodeURIComponent(search.query)}`;
 
-    console.log("Cerco:", product.name);
+    console.log("Cerco:", search.query);
 
     await page.goto(url, { waitUntil: 'networkidle2' });
 
@@ -74,15 +93,15 @@ async function checkVinted() {
       return results;
     });
 
-    console.log(product.name, "→ trovati:", items.length);
+    const channel = await client.channels.fetch(search.channelId);
 
     for (const item of items) {
-      if (!sentItems.has(item.link) && item.price <= product.maxPrice) {
+      if (!sentItems.has(item.link) && item.price <= search.maxPrice) {
         sentItems.add(item.link);
 
         await channel.send(
           `🚨 POSSIBILE AFFARE!\n` +
-          `Ricerca: ${product.name}\n` +
+          `Ricerca: ${search.query}\n` +
           `Prezzo: ${item.price}€\n` +
           `Link: ${item.link}`
         );
@@ -91,12 +110,82 @@ async function checkVinted() {
   }
 }
 
+// =====================
+// Commands
+// =====================
+
+client.on('messageCreate', async (message) => {
+
+  if (message.author.bot) return;
+
+  const args = message.content.split(" ");
+
+  // !add query prezzo
+  if (args[0] === "!add") {
+
+    if (args.length < 3) {
+      return message.reply("Uso: !add parola_chiave prezzo_max");
+    }
+
+    const maxPrice = parseFloat(args[args.length - 1]);
+    const query = args.slice(1, -1).join(" ");
+
+    const searches = loadSearches();
+
+    searches.push({
+      channelId: message.channel.id,
+      query,
+      maxPrice
+    });
+
+    saveSearches(searches);
+
+    return message.reply(`Ricerca aggiunta: "${query}" ≤ ${maxPrice}€`);
+  }
+
+  // !remove query
+  if (args[0] === "!remove") {
+
+    const query = args.slice(1).join(" ");
+    let searches = loadSearches();
+
+    searches = searches.filter(
+      s => !(s.channelId === message.channel.id && s.query === query)
+    );
+
+    saveSearches(searches);
+
+    return message.reply(`Ricerca rimossa: "${query}"`);
+  }
+
+  // !list
+  if (args[0] === "!list") {
+
+    const searches = loadSearches()
+      .filter(s => s.channelId === message.channel.id);
+
+    if (searches.length === 0)
+      return message.reply("Nessuna ricerca attiva in questo canale.");
+
+    let reply = "Ricerche attive:\n";
+    searches.forEach(s => {
+      reply += `• ${s.query} ≤ ${s.maxPrice}€\n`;
+    });
+
+    return message.reply(reply);
+  }
+});
+
+// =====================
+// Start
+// =====================
+
 client.once('clientReady', async () => {
   console.log(`Bot online come ${client.user.tag}`);
 
   await initBrowser();
-
   await checkVinted();
+
   setInterval(checkVinted, 120000);
 });
 
