@@ -1,6 +1,5 @@
 const { Client, GatewayIntentBits } = require('discord.js');
 const axios = require('axios');
-const cheerio = require('cheerio');
 
 const TOKEN = process.env.DISCORD_TOKEN;
 const CHANNEL_ID = process.env.CHANNEL_ID;
@@ -8,15 +7,6 @@ const CHANNEL_ID = process.env.CHANNEL_ID;
 const client = new Client({
   intents: [GatewayIntentBits.Guilds]
 });
-
-const products = [
-  {
-    name: "funko venom 888",
-    maxPrice: 999 // per test iniziale
-  }
-];
-
-const sentItems = new Set();
 
 async function checkVinted() {
   console.log("Controllo Vinted...");
@@ -32,14 +22,24 @@ async function checkVinted() {
 
     console.log("Lunghezza HTML:", data.length);
 
+    const channel = await client.channels.fetch(CHANNEL_ID);
+    if (channel) {
+      await channel.send("🔎 Test Vinted completato. Controlla i log su Railway.");
+    }
+
   } catch (err) {
     console.log("Errore:", err.message);
   }
 }
 
-
-client.once('ready', () => {
+// 🔥 IMPORTANTE: usare clientReady
+client.once('clientReady', () => {
   console.log(`Bot online come ${client.user.tag}`);
+
+  // Esegui subito al primo avvio
+  checkVinted();
+
+  // Poi ogni 2 minuti
   setInterval(checkVinted, 120000);
 });
 
