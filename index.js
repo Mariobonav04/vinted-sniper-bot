@@ -196,4 +196,4 @@ client.once('clientReady', async () => {
   setInterval(checkVinted, 120000);
 });
 
-client.login(TOKEN);
+//client.login(TOKEN);
