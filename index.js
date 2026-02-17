@@ -12,36 +12,63 @@ const client = new Client({
 const products = [
   {
     name: "funko venom 888",
-    maxPrice: 20
+    maxPrice: 999 // per test iniziale
   }
 ];
 
 const sentItems = new Set();
 
 async function checkVinted() {
-  console.log("Sto controllando Vinted...");
+  console.log("Controllo Vinted...");
 
   const channel = client.channels.cache.get(CHANNEL_ID);
   if (!channel) {
-    console.log("Canale non trovato!");
+    console.log("Canale non trovato");
     return;
   }
 
-  try {
-    const testUrl = "https://www.vinted.it/catalog?search_text=funko";
+  for (const product of products) {
+    try {
+      const url = `https://www.vinted.it/catalog?search_text=${encodeURIComponent(product.name)}`;
 
-    const { data } = await axios.get(testUrl, {
-      headers: {
-        "User-Agent": "Mozilla/5.0"
-      }
-    });
+      const { data } = await axios.get(url, {
+        headers: {
+          "User-Agent": "Mozilla/5.0"
+        }
+      });
 
-    console.log("Pagina ricevuta!");
+      const $ = cheerio.load(data);
 
-    channel.send("✅ BOT ATTIVO - Pagina Vinted letta correttamente!");
+      $('a[href*="/items/"]').each((_, el) => {
+        const relativeLink = $(el).attr('href');
+        if (!relativeLink) return;
 
-  } catch (err) {
-    console.log("Errore Vinted:", err.message);
+        const link = "https://www.vinted.it" + relativeLink;
+
+        if (sentItems.has(link)) return;
+
+        const parent = $(el).closest('div');
+        const priceText = parent.text().match(/(\d+,\d+|\d+)\s?€/);
+
+        if (!priceText) return;
+
+        const price = parseFloat(priceText[0].replace('€', '').replace(',', '.'));
+
+        if (price <= product.maxPrice) {
+          sentItems.add(link);
+
+          channel.send(
+            `🚨 POSSIBILE AFFARE!\n` +
+            `Prodotto: ${product.name}\n` +
+            `Prezzo: ${price}€\n` +
+            `Link: ${link}`
+          );
+        }
+      });
+
+    } catch (err) {
+      console.log("Errore:", err.message);
+    }
   }
 }
 
