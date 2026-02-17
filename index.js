@@ -9,8 +9,8 @@ const client = new Client({
 });
 
 const products = [
-  { name: "funko venom 888", maxPrice: 20 },
-  { name: "funko carnage 926", maxPrice: 18 }
+  { name: "funko venom", maxPrice: 20 },
+  { name: "funko carnage", maxPrice: 18 }
 ];
 
 const sentItems = new Set();
