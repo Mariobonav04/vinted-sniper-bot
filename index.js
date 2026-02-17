@@ -10,8 +10,8 @@ const client = new Client({
 
 const products = [
   {
-    name: "funko venom 888",
-    maxPrice: 20
+    name: "funko",
+    maxPrice: 120
   }
 ];
 
@@ -54,11 +54,30 @@ async function checkVinted() {
 
 
     const items = await page.evaluate(() => {
-  const links = Array.from(document.querySelectorAll('a'));
-  return links
-    .map(link => link.href)
-    .filter(href => href.includes('/items/'));
+  const results = [];
+
+  const cards = document.querySelectorAll('[data-testid="grid-item"]');
+
+  cards.forEach(card => {
+    const linkElement = card.querySelector('a[href*="/items/"]');
+    if (!linkElement) return;
+
+    const link = linkElement.href;
+
+    // Il prezzo spesso è il primo testo con €
+    const text = card.innerText;
+    const priceMatch = text.match(/(\d+,\d+|\d+)\s?€/);
+
+    if (!priceMatch) return;
+
+    const price = parseFloat(priceMatch[0].replace('€', '').replace(',', '.'));
+
+    results.push({ link, price });
+  });
+
+  return results;
 });
+
 
 
     console.log("Links trovati:", items.length);
