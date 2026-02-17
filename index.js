@@ -50,27 +50,31 @@ async function checkVinted() {
 
     console.log("Carico:", url);
 
-    await page.goto(url, { waitUntil: 'domcontentloaded' });
+    await page.goto(url, { waitUntil: 'networkidle2' });
+
 
     const items = await page.evaluate(() => {
       const results = [];
-      const links = document.querySelectorAll('a[href*="/items/"]');
-
-      links.forEach(link => {
-        const priceElement = link.querySelector('[data-testid="item-price"]');
-        if (!priceElement) return;
-
+    
+      const cards = document.querySelectorAll('[data-testid="grid-item"]');
+    
+      cards.forEach(card => {
+        const link = card.querySelector('a');
+        const priceElement = card.querySelector('[data-testid="item-price"]');
+    
+        if (!link || !priceElement) return;
+    
         const priceText = priceElement.innerText;
         const price = parseFloat(priceText.replace('€', '').replace(',', '.'));
-
+    
         results.push({
           link: link.href,
           price
         });
       });
 
-      return results;
-    });
+  return results;
+});
 
     console.log("Items trovati:", items.length);
 
