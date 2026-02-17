@@ -1,5 +1,5 @@
 const { Client, GatewayIntentBits } = require('discord.js');
-const axios = require('axios');
+const puppeteer = require('puppeteer');
 
 const TOKEN = process.env.DISCORD_TOKEN;
 const CHANNEL_ID = process.env.CHANNEL_ID;
@@ -8,49 +8,96 @@ const client = new Client({
   intents: [GatewayIntentBits.Guilds]
 });
 
+const products = [
+  {
+    name: "funko venom 888",
+    maxPrice: 20
+  }
+];
+
+const sentItems = new Set();
+
 async function checkVinted() {
-  console.log("Controllo Vinted API avanzato...");
+  console.log("Avvio browser...");
 
-  try {
-    const url = "https://www.vinted.it/api/v2/catalog/items?search_text=funko";
+  const browser = await puppeteer.launch({
+    headless: "new",
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox'
+    ]
+  });
 
-    const { data } = await axios.get(url, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
-        "Accept": "application/json, text/plain, */*",
-        "Accept-Language": "it-IT,it;q=0.9",
-        "Referer": "https://www.vinted.it/",
-        "Origin": "https://www.vinted.it",
-        "Connection": "keep-alive"
-      }
+  const page = await browser.newPage();
+
+  // Blocca immagini e css per alleggerire
+  await page.setRequestInterception(true);
+  page.on('request', (req) => {
+    if (
+      req.resourceType() === 'image' ||
+      req.resourceType() === 'stylesheet' ||
+      req.resourceType() === 'font'
+    ) {
+      req.abort();
+    } else {
+      req.continue();
+    }
+  });
+
+  for (const product of products) {
+
+    const url = `https://www.vinted.it/catalog?search_text=${encodeURIComponent(product.name)}`;
+
+    console.log("Carico:", url);
+
+    await page.goto(url, { waitUntil: 'domcontentloaded' });
+
+    const items = await page.evaluate(() => {
+      const results = [];
+      const links = document.querySelectorAll('a[href*="/items/"]');
+
+      links.forEach(link => {
+        const priceElement = link.querySelector('[data-testid="item-price"]');
+        if (!priceElement) return;
+
+        const priceText = priceElement.innerText;
+        const price = parseFloat(priceText.replace('€', '').replace(',', '.'));
+
+        results.push({
+          link: link.href,
+          price
+        });
+      });
+
+      return results;
     });
 
-    if (!data.items) {
-      console.log("Items non trovati");
-      return;
+    console.log("Items trovati:", items.length);
+
+    const channel = await client.channels.fetch(CHANNEL_ID);
+
+    for (const item of items) {
+      if (!sentItems.has(item.link) && item.price <= product.maxPrice) {
+
+        sentItems.add(item.link);
+
+        await channel.send(
+          `🚨 POSSIBILE AFFARE!\n` +
+          `Prodotto: ${product.name}\n` +
+          `Prezzo: ${item.price}€\n` +
+          `Link: ${item.link}`
+        );
+      }
     }
-
-    console.log("Items trovati:", data.items.length);
-    console.log("Primo titolo:", data.items[0].title);
-    console.log("Primo prezzo:", data.items[0].price);
-    console.log("Primo link:", "https://www.vinted.it/items/" + data.items[0].id);
-
-  } catch (err) {
-    console.log("Errore:", err.response?.status || err.message);
   }
+
+  await browser.close();
 }
 
-
-
-
-// 🔥 IMPORTANTE: usare clientReady
-client.once('clientReady', () => {
+client.once('clientReady', async () => {
   console.log(`Bot online come ${client.user.tag}`);
 
-  // Esegui subito al primo avvio
-  checkVinted();
-
-  // Poi ogni 2 minuti
+  await checkVinted();
   setInterval(checkVinted, 120000);
 });
 
