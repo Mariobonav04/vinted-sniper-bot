@@ -18,7 +18,7 @@ const sentItems = new Set();
 const DATA_FILE = './searches.json';
 
 // =====================
-// Utility file functions
+// File utils
 // =====================
 
 function loadSearches() {
@@ -57,7 +57,7 @@ async function initBrowser() {
 }
 
 // =====================
-// Scraper
+// Scraper con filtro 24h
 // =====================
 
 async function checkVinted() {
@@ -81,13 +81,16 @@ async function checkVinted() {
 
         const link = linkElement.href;
         const text = card.innerText;
-        const priceMatch = text.match(/(\d+,\d+|\d+)\s?€/);
 
+        const priceMatch = text.match(/(\d+,\d+|\d+)\s?€/);
         if (!priceMatch) return;
 
         const price = parseFloat(priceMatch[0].replace('€', '').replace(',', '.'));
 
-        results.push({ link, price });
+        const timeMatch = text.match(/(\d+\s*(minuti|minuto|ore|ora|giorni|giorno)|oggi|ieri)/i);
+        const timeText = timeMatch ? timeMatch[0].toLowerCase() : null;
+
+        results.push({ link, price, timeText });
       });
 
       return results;
@@ -96,13 +99,25 @@ async function checkVinted() {
     const channel = await client.channels.fetch(search.channelId);
 
     for (const item of items) {
+
+      if (!item.timeText) continue;
+
+      // 🔥 Filtro ultime 24 ore
+      if (
+        item.timeText.includes("giorni") ||
+        (item.timeText.includes("giorno") && !item.timeText.includes("ieri"))
+      ) {
+        continue;
+      }
+
       if (!sentItems.has(item.link) && item.price <= search.maxPrice) {
         sentItems.add(item.link);
 
         await channel.send(
-          `🚨 POSSIBILE AFFARE!\n` +
+          `🚨 POSSIBILE AFFARE (≤24h)\n` +
           `Ricerca: ${search.query}\n` +
           `Prezzo: ${item.price}€\n` +
+          `Pubblicato: ${item.timeText}\n` +
           `Link: ${item.link}`
         );
       }
@@ -111,7 +126,7 @@ async function checkVinted() {
 }
 
 // =====================
-// Commands
+// Discord Commands
 // =====================
 
 client.on('messageCreate', async (message) => {
@@ -120,7 +135,6 @@ client.on('messageCreate', async (message) => {
 
   const args = message.content.split(" ");
 
-  // !add query prezzo
   if (args[0] === "!add") {
 
     if (args.length < 3) {
@@ -143,7 +157,6 @@ client.on('messageCreate', async (message) => {
     return message.reply(`Ricerca aggiunta: "${query}" ≤ ${maxPrice}€`);
   }
 
-  // !remove query
   if (args[0] === "!remove") {
 
     const query = args.slice(1).join(" ");
@@ -158,7 +171,6 @@ client.on('messageCreate', async (message) => {
     return message.reply(`Ricerca rimossa: "${query}"`);
   }
 
-  // !list
   if (args[0] === "!list") {
 
     const searches = loadSearches()
